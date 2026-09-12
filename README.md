@@ -95,6 +95,49 @@ ruling on an undecided `SUBMITTED` milestone is never treated as a bet
 against anyone, so it is never subject to forfeiture — the bond simply comes
 back regardless of the verdict.
 
+## Production hardening
+
+Three changes that only matter once real, occasionally-unreliable
+infrastructure and real-scale usage are involved -- not correctness fixes to
+what was there before, but the gap between a working demo and a contract
+built to run unattended on a live network:
+
+**Dynamic deliverables.** `_judge` renders with
+`wait_after_loaded="3s"` (`RENDER_WAIT_AFTER_LOADED`). A deliverable is
+frequently a client-rendered app (React/Vue/Next.js), not a static page --
+without a render delay, GenVM can capture the page before its own scripts
+have painted anything, and every validator would end up judging an empty
+shell rather than the actual deliverable.
+
+**Transient infrastructure failures no longer masquerade as a verdict.**
+`_judge` now raises a `gl.vm.UserError`, tagged `[TRANSIENT_FETCH]`,
+`[TRANSIENT_LLM]`, or `[LLM_MALFORMED]`, for anything that looks like
+infrastructure trouble -- the fetch itself failing, the LLM call itself
+failing, or the LLM responding with something that will not parse as the
+requested JSON shape -- instead of quietly returning an `INCONCLUSIVE`
+verdict for all of them. `INCONCLUSIVE` is now reserved for the one case
+that is actually a fact about the deliverable: the page loaded without error
+and had nothing readable on it. `dispute_milestone` and `preview_dispute`
+catch the raised error and respond with `{"ok": true, "verdict":
+"RETRY_LATER", ...}` -- the bond is returned, the milestone's status and
+`ai_verdict` are left exactly as they were, and nothing about the failure is
+written to the permanent record. `_adjudicate`'s `validator_fn` also
+classifies these the same way a validator running independently would, so
+that two nodes hitting the same class of outage agree with each other
+rather than needlessly burning a leader-rotation round on an outage that
+will likely recur immediately with the next leader too.
+
+**O(1) job completion.** `_mark_settled` replaces the old
+`_maybe_complete_job`, which re-scanned every milestone on a job each time
+any single one of them settled -- harmless at one milestone, wasteful at
+`MAX_MILESTONES_PER_JOB` (30), where every approval, dispute resolution,
+cancellation, or reclaim on that job would re-read the whole set. A job now
+carries `settled_milestone_count`, incremented exactly once per milestone at
+the moment it reaches a terminal status; comparing it to `milestone_count`
+is equivalent to the old scan without ever performing it. An `INCONCLUSIVE`
+or `RETRY_LATER` outcome deliberately does not advance the counter, since
+neither one is a terminal settlement.
+
 ## Milestone lifecycle
 
 ```
@@ -149,6 +192,15 @@ python3 -m unittest discover -s test -v
 ```
 
 ## Deploying to Studionet
+
+`GigEscrow.py` gained a new storage field (`settled_milestone_count` on
+`Job`) as part of the production-hardening changes above, so an address
+already deployed from an earlier version of this file is running the old
+storage layout and logic -- editing the source does not change what is
+already on-chain. A new version needs a fresh deployment (a new address),
+not an in-place upgrade. If a `TalentGate` was deployed pointing at the old
+`GigEscrow` address, point it at the new one with `set_oracle` (owner-only)
+instead of redeploying it -- `TalentGate.py` itself did not change.
 
 ```bash
 npm install -g genlayer
