@@ -248,48 +248,15 @@ the older storage layout and logic.
 
 I have no network access to Studionet from the environment these contracts
 were written in, so these two addresses are unverified on my end -- they are
-exactly what was reported after deployment. Sanity-check them yourself with:
+exactly what was reported after deployment. Sanity-check them yourself
+through [studio.genlayer.com](https://studio.genlayer.com) (paste the
+address in to import an already-deployed contract) or with the CLI:
 
 ```bash
-node deploy/interact.mjs config
-node deploy/interact.mjs stats
-node deploy/interact.mjs tiers
+genlayer call 0xbf9485b10851ceF84292a3016CE7cfaaFAE6b314 get_config
+genlayer call 0xbf9485b10851ceF84292a3016CE7cfaaFAE6b314 get_platform_stats
+genlayer call 0xB288510e39ceFe6dD1F3704629e33743C1c09a93 get_tier_thresholds
 ```
-
-### `deploy/interact.mjs`
-
-A small command-line client wired to the two addresses above, built because
-the `genlayer` CLI's `write` command has no `--value` option -- it cannot
-sign `fund_milestone` or `dispute_milestone`, the two calls that actually
-move GEN. Every field and return shape it relies on (`writeContract`'s
-`value: bigint` parameter, `waitForTransactionReceipt`'s `txExecutionResultName`
-and `statusName`, `createAccount`'s optional private-key argument, the
-`studionet` chain export) was checked directly against the installed
-`genlayer-js` package's type declarations rather than assumed.
-
-```bash
-cd deploy
-npm install
-export PRIVATE_KEY=0x...   # the funded wallet you deployed with
-
-node interact.mjs                       # lists every command
-node interact.mjs config
-node interact.mjs create-job 0xFREELANCER... "Landing page redesign"
-node interact.mjs jobs-by-client $(node interact.mjs whoami | tail -1)
-node interact.mjs fund-milestone 1 "Ship a responsive landing page" 0.05
-node interact.mjs accept-job 1          # freelancer's wallet
-node interact.mjs submit-milestone 1 0 https://example.com/deliverable "done"
-node interact.mjs approve-milestone 1 0
-node interact.mjs dispute-milestone 1 0 0.01
-node interact.mjs eligible 0xFREELANCER... SENIOR
-```
-
-Every write command is followed automatically by a read of the resulting
-state (e.g. `fund-milestone` prints the job's milestone list right after),
-since a write transaction's own receipt exposes what went *in*
-(`function_name`/`function_args`) rather than what the contract method
-*returned* -- reading state back with a separate view call afterward is the
-documented pattern, not a workaround.
 
 ## Files
 
@@ -297,6 +264,5 @@ documented pattern, not a workaround.
 |---|---|
 | `contracts/GigEscrow.py` | the escrow contract -- milestone funding, submission, approval, and AI arbitration |
 | `contracts/TalentGate.py` | the composable consumer -- a live reputation gate for hiring |
-| `deploy/interact.mjs` | genlayer-js command-line client wired to the live Studionet addresses |
 | `test/test_gigescrow.py` | offline unit tests for the pure logic and bond-resolution rules |
 | `test/test_no_raise_in_payable.py` | structural test enforcing the payable-never-raises invariant |
