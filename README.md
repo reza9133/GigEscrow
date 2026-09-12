@@ -237,8 +237,14 @@ calls need to be signed with `genlayer-js` instead.
 
 | Contract | Address |
 |---|---|
-| `GigEscrow` | `0x17f4999A6bDA76456D3D136C4F4675Df3840388d` |
-| `TalentGate` | `0x89ad52F5235118329e987B549c6965eD2A76BEB9` |
+| `GigEscrow` | `0xbf9485b10851ceF84292a3016CE7cfaaFAE6b314` |
+| `TalentGate` | `0xB288510e39ceFe6dD1F3704629e33743C1c09a93` |
+
+This is the redeployment that includes the production-hardening changes
+above (`settled_milestone_count`, the `wait_after_loaded` render delay, and
+the transient-failure/`RETRY_LATER` handling) -- an earlier deployment of
+`GigEscrow` at a different address predates those changes and is running
+the older storage layout and logic.
 
 I have no network access to Studionet from the environment these contracts
 were written in, so these two addresses are unverified on my end -- they are
